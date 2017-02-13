@@ -11,15 +11,13 @@ size_t size();
 
 bool empty();
 
-size_t count(T&);
+void swap(set&);
 
 iterator find(T&);
 
 iterator lower_bound(T&);
 
-iterator insert(T&);
-
-iterator insert(iterator, T&);
+std::pair\<iterator,bool\> insert(T&);
 
 size_t erase(T&);
 
