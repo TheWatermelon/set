@@ -1,339 +1,387 @@
-/*
- *  SkipList.h
- *
- *  Jean Goulet 2015-10-26
- *
- */
+//
+//  set.h
+//  set
+//
+//  Jean Goulet  2015-11-13.
+//  Modification 2015-11-26
+//  Copyleft (c) 2015 UdeS
+//
 
-#pragma once
+#ifndef set_set_h
+#define set_set_h
 
-#include <iostream>
-#include <cstdlib>
 #include <vector>
 #include <string>
-#include <random>
-#include <chrono>
-//#include "/Users/goulet/CPPutil/divers.h"
+#include <cassert>
+#include <cmath>
 
-using std::string;
-using std::cout;
-using std::endl;
-using std::vector;
-
-template <typename T,typename compare=std::less<T> >
+template <typename TYPE>
 class set{
-private:
-	struct cellule{
-		T CONTENU;
-        vector<cellule*> PREC,SUIV;
-		cellule(T=T(),cellule* =nullptr,cellule* =nullptr);
-		};
-	size_t NBNIV;
-	size_t SIZE;
-	cellule AVANT,APRES;
-	
-	void initialiser();
-    bool plusPetit(const T&,cellule*)const;
-    bool plusPetit(cellule*,const T&)const;
-	bool egaux(const T&,cellule*)const;
-    size_t tirer_couches()const;
 public:
     class iterator;
-
-	set();
-	~set();
-	set(const set&);
-	const set& operator=(const set&);
-	
-	size_t size()const;
-	bool empty()const;
-    
-	size_t count(const T&)const;
-    iterator find(const T&);
-    iterator lower_bound(const T&);
-    
-	iterator insert(const T&);
-    iterator insert(iterator,const T&);
-	size_t erase(const T&);
-	iterator erase(iterator);
-	void clear();
-	
-	iterator begin()const;
-	iterator end()const;
-		
-	void afficher(string="")const;
-};
-
-/////////////////////////////////////////////////
-// cellule
-
-template <typename T,typename compare >
-set<T,compare>::cellule::cellule(T t,cellule* pr,cellule* su){
-    CONTENU=t;
-    PREC.push_back(pr);
-    SUIV.push_back(su);
-}
-
-
-/////////////////////////////////////////////////
-// iterator
-
-template <typename T,typename compare >
-class set<T,compare>::iterator{
+    friend class iterator;
 private:
-    cellule* POINTEUR;
+    struct noeud{
+        TYPE CONTENU;
+        noeud *PARENT,*GAUCHE,*DROITE;
+        size_t POIDS;
+        noeud(const TYPE& c,noeud* PAR,noeud*GAU=nullptr,noeud*DRO=nullptr):CONTENU(c),PARENT(PAR),GAUCHE(GAU),DROITE(DRO),POIDS(1){}
+        noeud():PARENT(nullptr),GAUCHE(nullptr),DROITE(nullptr),POIDS(0){}
+        ~noeud(){PARENT=GAUCHE=DROITE=nullptr;}
+    };
+    noeud *RACINE;
+    const noeud *DEBUT;
+    noeud APRES;
+    size_t SIZE;
+    //fonctions privees
+    void initialiser();
+    void vider(noeud*&);
+    void copier(noeud*,noeud*&,noeud*);
+    
+    bool insert(const TYPE&,noeud*&,iterator&);
+    bool ajoute_gauche(const TYPE&,noeud*&,iterator&);
+    bool ajoute_droite(const TYPE&,noeud*&,iterator&);
+    
+    bool erase(const TYPE&,noeud*&,noeud*&);
+    bool enleve_gauche(const TYPE&,noeud*&,noeud*&);
+    bool enleve_droite(const TYPE&,noeud*&,noeud*&);
+    bool eliminer(noeud*&,noeud*&);
+    
+    void transferer_vers_la_droite(noeud*&);
+    void transferer_vers_la_gauche(noeud*&);
+    void rotation_gauche_droite(noeud*&);
+    void rotation_droite_gauche(noeud*&);
+    
+    void afficher(set<TYPE>::noeud*,int,std::vector<std::string>&,double&,int&)const;
+    void afficher_barres(std::vector<std::string>&,int)const;
 public:
-    friend class set<T,compare>;
-    iterator(cellule*p=nullptr):POINTEUR(p){}
-    const T& operator*()const{return POINTEUR->CONTENU;}
-    iterator operator++();     //++i
-    iterator operator++(int);  //i++
-    iterator operator--();     //--i
-    iterator operator--(int);  //i--
-    bool operator==(const iterator&i2)const{return POINTEUR==i2.POINTEUR;}
-    bool operator!=(const iterator&i2)const{return POINTEUR!=i2.POINTEUR;}
+    set();
+    ~set(){clear();}
+    set(const set&);
+    set& operator=(const set&);
+    void swap(set&);
+    
+    size_t size()const{return SIZE;}
+    bool empty()const{return SIZE==0;}
+    void clear();
+    
+    iterator find(const TYPE&)const;
+    iterator lower_bound(const TYPE&)const;
+    std::pair<iterator,bool> insert(const TYPE&);
+    size_t erase(const TYPE&);
+    iterator erase(iterator);
+    
+    //fonction d'iteration
+    iterator begin()const{return iterator(DEBUT);}
+    iterator end()const{return iterator(APRES.DROITE);}
+    
+    //fonction de mise au point
+    void afficher()const;
+};
+
+template <typename TYPE>
+class set<TYPE>::iterator{
+private:
+    const noeud* POINTEUR;
+    static void avancer(const noeud*&);
+    static void reculer(const noeud*&);
+    friend class set<TYPE>;
+public:
+    iterator(const noeud*p=nullptr):POINTEUR(p){}
+    iterator(const iterator&)=default;
+    iterator& operator=(const iterator&)=default;
+    const TYPE& operator*()const{return POINTEUR->CONTENU;}
+    const TYPE* operator->()const{return &(POINTEUR->CONTENU);}
+    iterator& operator++(){avancer(POINTEUR);return *this;}                         //++i
+    iterator operator++(int){iterator copie(*this);avancer(POINTEUR);return copie;} //i++
+    iterator& operator--(){reculer(POINTEUR);return *this;}                         //--i
+    iterator operator--(int){iterator copie(*this);reculer(POINTEUR);return copie;} //i--
+    bool operator==(const iterator& dr)const{return POINTEUR==dr.POINTEUR;}
+    bool operator!=(const iterator& dr)const{return POINTEUR!=dr.POINTEUR;}
 };
 
 
-template <typename T,typename compare >
-typename set<T,compare>::iterator set<T,compare>::iterator::operator++(){
-    POINTEUR=POINTEUR->SUIV[0];
-    return *this;
-}
-
-template <typename T,typename compare >
-typename set<T,compare>::iterator set<T,compare>::iterator::operator++(int){
-    iterator r(POINTEUR);
-    POINTEUR=POINTEUR->SUIV[0];
-    return r;
-}
-
-template <typename T,typename compare >
-typename set<T,compare>::iterator set<T,compare>::iterator::operator--(){
-    POINTEUR=POINTEUR->PREC[0];
-    return *this;
-}
-
-template <typename T,typename compare >
-typename set<T,compare>::iterator set<T,compare>::iterator::operator--(int){
-    iterator r(POINTEUR);
-    POINTEUR=POINTEUR->PREC[0];
-    return r;
-}
-
-/////////////////////////////////////////////////
-// set
+///////////////////////////////////////////////////////////////////////////
 // fonctions privees
 
-template <typename T,typename compare >
-void set<T,compare>::initialiser(){
-    using namespace std;
-	NBNIV=1;
-	SIZE=0;
-    AVANT.PREC.clear();
-    AVANT.SUIV.clear();
-    APRES.PREC.clear();
-    APRES.SUIV.clear();
-    AVANT.SUIV.push_back(&APRES);
-    APRES.PREC.push_back(&AVANT);
+template <typename TYPE>
+void set<TYPE>::initialiser(){
+    DEBUT=RACINE=nullptr;
+    SIZE=0;
+    APRES.PARENT=nullptr;
+    APRES.GAUCHE=nullptr;
+    APRES.DROITE=&APRES;
 }
 
-template <typename T,typename compare >
-bool set<T,compare>::plusPetit(const T& t,cellule* p)const{
-    //verifie que t < contenu de *p
-    static compare plus_petit_que;
-    if(p->SUIV.size()==0)return true;  //p est la fin
-    if(p->PREC.size()==0)return false; //p avant le debut
-    return plus_petit_que(t,p->CONTENU);   //sinon utiliser le comparateur
+template <typename TYPE>
+void set<TYPE>::vider(noeud*& p){
+    if(p==nullptr)return;
+    vider(p->GAUCHE);
+    vider(p->DROITE);
+    delete p;
 }
 
-template <typename T,typename compare >
-bool set<T,compare>::plusPetit(cellule* p,const T& t)const{
-    //verifie que contenu de *p < t
-    static compare plus_petit_que;
-    if(p->SUIV.size()==0)return false; //p est la fin
-    if(p->PREC.size()==0)return true;  //p est avant le debut
-    return plus_petit_que(p->CONTENU,t);   //sinon utiliser le comparateur
+template <typename TYPE>
+void set<TYPE>::copier(noeud* source,noeud*& dest,noeud* parent){
+    if(source==nullptr)return;
+    dest=new noeud(*source);
+    dest->PARENT=parent;
+    dest->POIDS=source->POIDS;
+    copier(source->DROITE,dest->DROITE,dest);
+    copier(source->GAUCHE,dest->GAUCHE,dest);
 }
 
-template <typename T,typename compare >
-bool set<T,compare>::egaux(const T& t,cellule* p)const{
-    //verifie que t == *p
-    static compare plus_petit_que;
-    if(p->SUIV.size()==0)return false; //p est la fin
-    if(p->PREC.size()==0)return false; //p est avant le debut
-    if(plus_petit_que(*p->CONTENU,t))return false;   //vient avant
-    if(plus_petit_que(t,*p->CONTENU))return false;   //vient apres
-    return true;  //ni plus petit, ni plus grand
-	}
 
-template <typename T,typename compare >
-size_t set<T,compare>::tirer_couches()const{
-    //tirer au hasard le nombre de couches dans [1 et NBNIV+1]
-    static auto seed = std::chrono::system_clock::now().time_since_epoch().count();
-    static std::minstd_rand0 generator(static_cast<unsigned int>(seed));
-    size_t i=1;
-    auto g=generator();
-    for(;i<=NBNIV;++i){
-        if(g%2==0)break;
-        g/=2;
+///////////////////////////////////////////////////////////////////////////
+// insertion
+
+
+template <typename TYPE>
+bool set<TYPE>::insert(const TYPE& c,noeud*& p,iterator& r){
+    if(c<p->CONTENU){
+        if(ajoute_gauche(c,p,r)){
+            ++(p->POIDS);
+            transferer_vers_la_droite(p);
+            return true;
+        }
     }
-    return i;
+    else if(p->CONTENU<c){
+        if(ajoute_droite(c,p,r)){
+            ++(p->POIDS);
+            transferer_vers_la_gauche(p);
+            return true;
+        }
+    }
+    else r=iterator(p);
+    return false;
+}
+
+template <typename TYPE>
+bool set<TYPE>::ajoute_gauche(const TYPE& c,noeud*& p,iterator& r){
+    if(p->GAUCHE==nullptr){  //nouvelle feuille
+        p->GAUCHE=new noeud(c,p);
+        ++SIZE;
+        r=iterator(p->GAUCHE);
+        if(p==DEBUT)DEBUT=p->GAUCHE;  //nouveau premier element
+        return true;
+    }
+    else                    //ajout general a gauche
+        return insert(c,p->GAUCHE,r);
+}
+
+template <typename TYPE>
+bool set<TYPE>::ajoute_droite(const TYPE& c,noeud*& p,iterator& r){
+    if(p->DROITE==nullptr){  //nouvelle feuille
+        p->DROITE=new noeud(c,p);
+        ++SIZE;
+        r=iterator(p->DROITE);
+        return true;
+    }
+    else  //ajout general a droite
+        return insert(c,p->DROITE,r);
+}
+
+///////////////////////////////////////////////////////////////////////////
+// elimination
+
+template <typename TYPE>
+bool set<TYPE>::erase(const TYPE& c,noeud*& p,noeud*& aRemplacer){
+    if(c<p->CONTENU)
+        return enleve_gauche(c,p,aRemplacer);
+    else if(p->CONTENU<c)
+        return enleve_droite(c,p,aRemplacer);
+    else{
+        aRemplacer=p;
+        return enleve_gauche(c,p,aRemplacer);
+    }
+}
+
+template <typename TYPE>
+bool set<TYPE>::enleve_gauche(const TYPE& c,noeud*& p,noeud*& aRemplacer){
+    if(p->GAUCHE==nullptr)
+        return eliminer(p,aRemplacer);
+    else if(erase(c,p->GAUCHE,aRemplacer)){
+        --(p->POIDS);
+        transferer_vers_la_gauche(p);
+        return true;
+        }
+    else
+        return false;
+}
+
+template <typename TYPE>
+bool set<TYPE>::enleve_droite(const TYPE& c,noeud*& p,noeud*& aRemplacer){
+    if(p->DROITE==nullptr)
+        return eliminer(p,aRemplacer);
+    else if(erase(c,p->DROITE,aRemplacer)){
+        --(p->POIDS);
+        transferer_vers_la_droite(p);
+        return true;
+    }
+    else
+        return false;
+}
+
+template <typename TYPE>
+bool set<TYPE>::eliminer(noeud*& p,noeud*& aRemplacer){
+    if(aRemplacer!=nullptr){
+        bool x=DEBUT==p;
+        if(x)iterator::avancer(DEBUT);
+        aRemplacer->CONTENU=p->CONTENU;
+        aRemplacer=p;
+        if(p->GAUCHE==nullptr)p=p->DROITE;else p=p->GAUCHE;
+        if(p!=nullptr)p->PARENT=aRemplacer->PARENT;
+        --SIZE;
+        delete aRemplacer;
+        aRemplacer=nullptr;
+        return true;
+        }
+    else
+        return false;
 }
 
 
-/////////////////////////////////////////////////
-// set
+
+///////////////////////////////////////////////////////////////////////////
 // fonctions publiques
 
-template <typename T,typename compare >
-set<T,compare>::set(){
-	initialiser();
-	}
-
-template <typename T,typename compare >
-set<T,compare>::~set(){
-	clear();
-	}
-
-template <typename T,typename compare >
-set<T,compare>::set(const set& src){
-	initialiser();
-	*this=src;
-	}
-
-
-template <typename T,typename compare >
-size_t set<T,compare>::size()const{
-	return SIZE;
+template <typename TYPE>
+set<TYPE>::set(){
+    initialiser();
 }
 
-template <typename T,typename compare >
-bool set<T,compare>::empty()const{
-	return SIZE==0;
+template <typename TYPE>
+set<TYPE>::set(const set& source):set(){
+    copier(source.RACINE,RACINE,nullptr);
+    SIZE=source.size();
 }
 
-template <typename T,typename compare >
-size_t set<T,compare>::count(const T& t)const{
-    auto it=find(t);
-    if(it==end())return 0;
-    else return 1;
-	}
-
-template <typename T,typename compare >
-typename set<T,compare>::iterator set<T,compare>::find(const T& t){
-    auto it=lower_bound(t);
-    if(plusPetit(t,it.POINTEUR))return end();
-    return it;
+template <typename TYPE>
+set<TYPE>& set<TYPE>::operator=(const set& source){
+    if(this==&source)return *this;
+    set<TYPE> copie(source);
+    this->swap(copie);
+    return *this;
 }
 
-template <typename T,typename compare >
-typename set<T,compare>::iterator set<T,compare>::insert(const T& t){
-    iterator it=lower_bound(t);
-    if(plusPetit(t,it.POINTEUR))it=insert(it,t);
-    return it;
+template <typename TYPE>
+void set<TYPE>::swap(set& source){
+    std::swap(SIZE,source.SIZE);
+    std::swap(RACINE,source.RACINE);
+    std::swap(DEBUT,source.DEBUT);
+    std::swap(APRES.GAUCHE,source.APRES.GAUCHE);
 }
 
-template <typename T,typename compare >
-typename set<T,compare>::iterator set<T,compare>::insert(iterator it,const T& t){
-    //verifier que l'on est a la bonne place
-    iterator av=it;--av;
-    cellule* pa=av.POINTEUR;
-    cellule* pi=it.POINTEUR;
-    cellule* p;
-    size_t i;
-    if(plusPetit(t,pa) || plusPetit(pi,t))return insert(t);
-    size_t nbc=tirer_couches();
-    if(nbc>NBNIV){
-        //ajouter une nouvelle couche
-        AVANT.SUIV.push_back(&APRES);
-        APRES.PREC.push_back(&AVANT);
-        ++NBNIV;
+template <typename TYPE>
+void set<TYPE>::clear(){
+    vider(RACINE);
+    initialiser();
+}
+
+template <typename TYPE>
+typename set<TYPE>::iterator set<TYPE>::find(const TYPE& c)const{
+    iterator retour=lower_bound(c);
+    if(retour==end() || c<*retour)return end();
+    return retour;
+}
+
+template <typename TYPE>
+std::pair<typename set<TYPE>::iterator,bool> set<TYPE>::insert(const TYPE& c){
+    if(SIZE==0){  //arbre vide
+        DEBUT=APRES.GAUCHE=RACINE=new noeud(c,&APRES);
+        SIZE=1;
+        return std::make_pair(begin(),true);
         }
-    //inserer la nouvelle cellule entre pa et pi
-    pi->PREC[0]=pa->SUIV[0]=p=new cellule(t,pa,pi);
-    ++SIZE;
-    //creer le bon nombre d'entrees dans la nouvelle cellule
-    p->PREC.resize(nbc);
-    p->SUIV.resize(nbc);
-    //inserer la nouvelle cellule dans les couches
-    for(i=1;i<nbc;++i){
-        //avancer au besoin pi vers le prochain
-        while(pi->SUIV.size()==i)pi=pi->SUIV.back();
-        pa=pi->PREC[i];
-        pa->SUIV[i]=p;
-        pi->PREC[i]=p;
-        p->SUIV[i]=pi;
-        p->PREC[i]=pa;
+    iterator retour;
+    bool valeur=insert(c,RACINE,retour);
+    APRES.GAUCHE=RACINE;
+    return std::make_pair(retour,valeur);
+}
+
+template <typename TYPE>
+size_t set<TYPE>::erase(const TYPE& c){
+    if(SIZE!=0){
+        noeud* aRemplacer=nullptr;
+        if(erase(c,RACINE,aRemplacer)){
+            APRES.GAUCHE=RACINE;
+            if(RACINE!=nullptr)RACINE->PARENT=APRES.DROITE;
+            return 1;
         }
-    it.POINTEUR=p;
-    return it;
+    }
+    return 0;
 }
 
-template <typename T,typename compare >
-size_t set<T,compare>::erase(const T& t){
-    iterator it=find(t);
-    if(it==end())return 0;
-    erase(it);
-    return 1;
-	}
-
-
-/////////////////////////////////////////////////
-// iteration
-
-template <typename T,typename compare >
-typename set<T,compare>::iterator set<T,compare>::begin()const{
-    return iterator(AVANT.SUIV[0]);
+template <typename TYPE>
+typename set<TYPE>::iterator set<TYPE>::erase(iterator i){
+    assert(i!=end());
+    TYPE c=*i;
+    erase(c);
+    return lower_bound(c);
 }
 
-template <typename T,typename compare >
-typename set<T,compare>::iterator set<T,compare>::end()const{
-    iterator it(APRES.PREC[0]->SUIV[0]);
-    return it;
-}
 
-/////////////////////////////////////////////////
-// afficher
-
-template <typename T,typename compare >
-void set<T,compare>::afficher(string st)const{
+///////////////////////////////////////////////////////////////////////////
+// fonctions de mise au point
+template <typename TYPE>
+void set<TYPE>::afficher()const{
     using namespace std;
-    cout<<endl;
-	cout<<"------------------------------------------"<<st<<endl;
+    double total=0.;
+    int max=0;
+    cout<<"-------------------------------"<<endl;
+    vector<string> barres;
+    barres.push_back("    ");
+    afficher(RACINE,1,barres,total,max);
+    total=total/SIZE;
+    cout<<SIZE<<" element";if(SIZE>1)cout<<"s";cout<<endl;
+    cout<<"log("<<SIZE<<"): "<<log2(double(SIZE))<<endl;
+    cout<<"hauteur moyenne: "<<total<<endl;
+    cout<<"hauteur maximale: "<<max<<endl;
+    cout<<"-------------------------------"<<endl;
+}
+
+
+template <typename TYPE>
+void set<TYPE>::afficher(set<TYPE>::noeud* p,int niveau,std::vector<std::string>& barres,double& total,int& max)const{
+    using namespace std;
+    if(p==0)return;
+    total+=niveau;
+    if(niveau>max)max=niveau;
+    if(niveau>=barres.size())barres.push_back("    ");
     
-    string une_clef,lignes,clefs;
-    T elem;
-    cellule *p;
-    lignes=to_string(SIZE)+" elements";
-	for(size_t nb=NBNIV;nb>0;){
-        string clefs=" ";
-        nb--;
-		//afficher toute la couche nb
-        cout<<lignes<<endl;
-        lignes="|";
-        for(auto it=begin();it!=end();++it){
-            if(it.POINTEUR->SUIV.size()>nb){
-                p=it.POINTEUR;
-                elem=p->CONTENU;
-                une_clef="---"+to_string(elem);
-                clefs+=une_clef.substr(une_clef.size()-4,4);
-                lignes+="   |";
-                }
-            else{
-                clefs+="----";
-                lignes+="    ";
-                }
-            }
-        clefs+="--";
-        cout<<clefs<<endl;
-        lignes+="  |";
-		}
-    cout<<"------------------------------------------"<<st<<endl;
-	cout<<endl<<endl;
-	}
+    afficher(p->DROITE,niveau+1,barres,total,max);
+    
+    //si on est un enfant de gauche arreter les barres a ce niveau
+    if(p->PARENT!=0 && p->PARENT->GAUCHE==p)barres[niveau-1]="    ";
+    
+    //cout<<niveau;
+    afficher_barres(barres,niveau);
+    cout<<"--->";
+    cout<<p->CONTENU<<" ("<<p->POIDS;
+    //cout<<", "<<p;
+    //cout<<", par="<<p->PARENT;
+    //cout<<", gau="<<p->GAUCHE;;
+    //cout<<", dro="<<p->DROITE;
+    cout<<")"<<endl;
+    
+    //si on est un enfant de droite barre a mon niveau
+    if(p->PARENT->DROITE==p)barres[niveau-1]="   |";
+    
+    //si on a un enfant a gauche mettre des barres apres
+    if(p->GAUCHE!=0)barres[niveau]="   |";
+    else barres[niveau]="    ";
+    
+    //cout<<niveau;
+    afficher_barres(barres,niveau+1);
+    cout<<endl;
+    
+    afficher(p->GAUCHE,niveau+1,barres,total,max);
+}
 
-
-////////////////////////////////////////////////////////////
+template <typename TYPE>
+void set<TYPE>::afficher_barres(std::vector<std::string>& barres,int n)const{
+    for(int i=0;i<n;++i)std::cout<<barres[i];
+}
 
 #include "set2.h"
+
+#endif

@@ -1,84 +1,180 @@
 //
 //  set2.h
-//  SkipList
+//  WBT
 //
-//  Jean Goulet 2015-10-29
-//  Bastien Chapusot	15 149 590
-//  Eddy Ouedraogo	14 178 490
-//  2015-11-05
+//  Jean Goulet on 2015-11-13.
+//  Copyleft (c) 2015 UdeS
+//
+//	Bastien Chapusot	15 149 590
+//	Francis Trepanier	15 102 504
+//
 
-#ifndef SkipList_set2_h
-#define SkipList_set2_h
+#ifndef WBT_set2_h
+#define WBT_set2_h
 
-template <typename T,typename compare >
-typename set<T,compare>::iterator set<T,compare>::lower_bound(const T& t){
-    iterator it;
-    static compare plus_petit_que;
+#include <iostream>
+
+///////////////////////////////////////////////////////////////////////////
+// lower_bound
+
+template <typename TYPE>
+typename set<TYPE>::iterator set<TYPE>::lower_bound(const TYPE& c)const{
+    //localise le premier element non inferieur a c
+    if(SIZE == 0) return end();
     
-    size_t niv = NBNIV-1;
-    for(it.POINTEUR=AVANT.SUIV[niv]; it!= end();) {
-        if(plusPetit(it.POINTEUR,t)) {
-            it.POINTEUR = it.POINTEUR->SUIV[niv];
-        } else {
-            if(!plusPetit(t,it.POINTEUR)) {
-                break;
-            } else {
-                niv--;
-            }
-        }
+    noeud* doigt=RACINE;
+    while(1) {
+    	if(c < doigt->CONTENU) {
+    		if(doigt->GAUCHE == nullptr) {
+    			return iterator(doigt);
+    		} else {
+    			doigt = doigt->GAUCHE;
+    		}
+    	} else if(!(doigt->CONTENU < c)) {
+    		return iterator(doigt);
+    	} else {
+    		if(doigt->DROITE == nullptr) {
+    			return end();
+    		} else {
+    			doigt = doigt->DROITE;
+    		}
+    	}
     }
-
-    return it;
+    return end();
 }
 
-template <typename T,typename compare >
-typename set<T,compare>::iterator set<T,compare>::erase(iterator it){
-	int nivASuppr = it.POINTEUR->SUIV.size();
-	cellule* tmpPrec;
-	cellule* tmpSuiv;
+///////////////////////////////////////////////////////////////////////////
+// fonctions supplementaires de la class iterator
 
-	for(int i=nivASuppr-1; i>=0; --i) {
-		tmpPrec = it.POINTEUR->PREC[i];
-		tmpSuiv = it.POINTEUR->SUIV[i];
-		// on isole la cellule a supprimer
-		tmpPrec->SUIV[i] = tmpSuiv;
-		tmpSuiv->PREC[i] = tmpPrec;
+template <typename TYPE>
+void set<TYPE>::iterator::avancer(const noeud*& p){
+    //AVANCER le pointeur p vers le prochain noeud en inordre
+    //cette fonction fait automatiquement exception
+    //si on avance au-dela de la fin
+    if(p->DROITE == nullptr) {
+    	while(p != p->PARENT->GAUCHE) {
+    		p = p->PARENT;
+    	}
+    	p = p->PARENT;
+    } else {
+    	p = p->DROITE;
+    	while(p->GAUCHE != nullptr) {
+    		p = p->GAUCHE;
+    	}
+    }
+}
 
-		// doit-on supprimer un niveau?
-		if(tmpPrec->PREC[i] == nullptr && tmpSuiv->SUIV[i] == nullptr) {
-			AVANT.SUIV.pop_back();
-			APRES.PREC.pop_back();
-			NBNIV--;
+template <typename TYPE>
+void set<TYPE>::iterator::reculer(const noeud*& p){
+    //RECULER le pointeur p vers le noeud precedent en inordre
+    //cette fonction fait automatiquement exception
+    //si on recule du debut
+	if(p->GAUCHE == nullptr) {
+    	while(p != p->PARENT->DROITE) {
+    		p = p->PARENT;
+    	}
+    	p = p->PARENT;
+    } else {
+    	p = p->GAUCHE;
+    	while(p->DROITE != nullptr) {
+    		p = p->DROITE;
+    	}
+    }
+}
+
+
+///////////////////////////////////////////////////////////////////////////
+// equilibre
+
+
+template <typename TYPE>
+void set<TYPE>::transferer_vers_la_droite(noeud*& p){
+	if(p->GAUCHE == nullptr) return;
+	if(p->GAUCHE->POIDS < 4) return;
+	size_t tmpPoidsDroite = (p->DROITE == nullptr) ? 0 : p->DROITE->POIDS;
+	size_t tmpPoidsGauche = p->GAUCHE->POIDS;
+	if(tmpPoidsGauche > 3*tmpPoidsDroite) {
+		if(p->GAUCHE->GAUCHE != nullptr || p->GAUCHE->DROITE != nullptr) {
+			tmpPoidsDroite = (p->GAUCHE->DROITE == nullptr) ? 0 : p->GAUCHE->DROITE->POIDS;
+			tmpPoidsGauche = (p->GAUCHE->GAUCHE == nullptr) ? 0 : p->GAUCHE->GAUCHE->POIDS;
+			if(tmpPoidsGauche < tmpPoidsDroite) {
+				rotation_droite_gauche(p->GAUCHE);
+			}
 		}
+		rotation_gauche_droite(p);
 	}
-	delete it.POINTEUR;
-	SIZE--;
-
-    return iterator(tmpSuiv);
 }
 
-template <typename T,typename compare >
-const set<T,compare>& set<T,compare>::operator=(const set& src){
-	// Copie de la taille, du maillage de niveaux et des cellules
-	clear();
+template <typename TYPE>
+void set<TYPE>::transferer_vers_la_gauche(noeud*& p){
+	if(p->DROITE == nullptr) return;
+	if(p->DROITE->POIDS < 4) return;
+	size_t tmpPoidsGauche = (p->GAUCHE == nullptr) ? 0 : p->GAUCHE->POIDS;
+	size_t tmpPoidsDroite = p->DROITE->POIDS;
+	if(tmpPoidsDroite > 3*tmpPoidsGauche) {
+		if(p->DROITE->GAUCHE != nullptr || p->DROITE->DROITE != nullptr) {
+			tmpPoidsGauche = (p->DROITE->GAUCHE == nullptr) ? 0 : p->DROITE->GAUCHE->POIDS;
+			tmpPoidsDroite = (p->DROITE->DROITE == nullptr) ? 0 : p->DROITE->DROITE->POIDS;
+			if(tmpPoidsGauche < tmpPoidsDroite) {
+				rotation_gauche_droite(p->DROITE);
+			}
+		}
+		rotation_droite_gauche(p);
+	}
+}
+
+template <typename TYPE>
+void set<TYPE>::rotation_gauche_droite(noeud*& p){
+	if(p->GAUCHE == nullptr) return;
+	// MAJ du poids
+	size_t tmpPoids = p->GAUCHE->POIDS;
+	p->GAUCHE->POIDS = p->POIDS;
+	p->POIDS = tmpPoids;
+
+	p->GAUCHE->PARENT = p->PARENT;
+	p->PARENT = p->GAUCHE;
+	p->GAUCHE = p->PARENT->DROITE;
+	if(p->PARENT->DROITE != nullptr)
+		p->PARENT->DROITE->PARENT = p;
+	p->PARENT->DROITE = p;
 	
-	for(iterator it=src.begin(); it!=src.end(); ++it) {
-		insert(it.POINTEUR->CONTENU);
+	if(p->PARENT->PARENT->GAUCHE == p) {
+		p->PARENT->PARENT->GAUCHE = p->PARENT;
+	} else if (p->PARENT->PARENT->DROITE == p) {
+		p->PARENT->PARENT->DROITE = p->PARENT;
 	}
 
-    return *this;
+	if(p == RACINE) {
+		RACINE = p->PARENT;
+	}
 }
 
-template <typename T,typename compare >
-void set<T,compare>::clear(){
-	for(cellule* tmp=AVANT.SUIV[0]; tmp->SUIV[0]!=nullptr; ) {
-		tmp = tmp->SUIV[0];		
-		delete tmp->PREC[0];	
+template <typename TYPE>
+void set<TYPE>::rotation_droite_gauche(noeud*& p){
+	if(p->DROITE == nullptr) return;
+	// MAJ du poids
+	size_t tmpPoids = p->DROITE->POIDS;
+	p->DROITE->POIDS = p->POIDS;
+	p->POIDS = tmpPoids;
+
+	p->DROITE->PARENT = p->PARENT;
+	p->PARENT = p->DROITE;
+	p->DROITE = p->PARENT->GAUCHE;
+	if(p->PARENT->GAUCHE != nullptr)
+		p->PARENT->GAUCHE->PARENT = p;
+	p->PARENT->GAUCHE = p;
+
+	if(p->PARENT->PARENT->GAUCHE == p) {
+		p->PARENT->PARENT->GAUCHE = p->PARENT;
+	} else if (p->PARENT->PARENT->DROITE == p) {
+		p->PARENT->PARENT->DROITE = p->PARENT;
 	}
 
-	initialiser();
-	
+	if(p == RACINE) {
+		RACINE = p->PARENT;
+	}
 }
+
 
 
 #endif
